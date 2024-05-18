@@ -101,8 +101,8 @@ void insere_tabela_de_simbolos( TipoDecl decl, Atributos att) {
 
 
 void print( vector<string> codigo ) {
-  for( string s : codigo )
-    cout << s << " ";
+  for( int i = 1; i <= codigo.size(); i++)
+    cout << i << ": " << codigo[i] << "\n";
     
   cout << endl;  
 }
@@ -144,10 +144,10 @@ void checarVariavelConst(Atributos att) {
 
 %%
 
-S : CMDs { print( resolve_enderecos( $1.c + "\n." ) ); }
+S : CMDs { print( resolve_enderecos( $1.c + "." ) ); }
   ;
 
-CMDs : CMDs CMD  { $$.c =  $1.c + "\n" + $2.c ; };
+CMDs : CMDs CMD  { $$.c =  $1.c + $2.c ; };
      | CMD
      ;
      
@@ -161,6 +161,8 @@ CMD : CMD_LET ';'
     | CMD_FOR
     | E ';'
       { $$.c = $1.c + "^"; }
+    | '{' CMDs '}' ';'
+      { $$.c = $2.c; }
     ;
 
 CMD_WHILE : WHILE '(' E ')' CMD
