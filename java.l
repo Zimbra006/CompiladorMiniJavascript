@@ -45,6 +45,7 @@ ID        {L}({L}|{D})*
 "else"     { return token( ELSE ); }
 "print"    { return token( PRINT ); }
 "for"      { return token( FOR ); }
+"while"    { return token( WHILE ); }
 
 "{}"       { return token( OBJ ); }
 "[]"       { return token( ARRAY ); }
