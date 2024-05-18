@@ -114,7 +114,21 @@ void printTabela() {
              << "Linha: " << a.second.linha << endl
              << "Coluna: " << a.second.coluna << endl
              << "Tipo: " << a.second.tipo << endl;
-    }
+}
+
+void checarVariavelExistente(Atributos att) {
+  // Checa se uma variável que vai ser modificada já existe
+  // Se não, retorna erro
+  // Se sim, retorna erro caso tenha sido declarada com const
+  if (ts.count( att.c[0] ) < 1) {
+    cout << "Erro: a variável '" << att.c[0] << "' não foi declarada." << endl; 
+    exit(1);
+  }
+  else if (ts[att.c[0]].tipo == DeclConst) {
+    cout << "Erro: tentativa de modificar uma variável constante ('" << att.c[0] << "')." << endl; 
+    exit (1);
+  }
+}
 %}
 
 %token ID IF ELSE PRINT FOR
@@ -124,7 +138,7 @@ void printTabela() {
 %token AND OR ME_IG MA_IG DIF IGUAL
 %token MAIS_IGUAL MAIS_MAIS
 
-%right '='
+%right '=' MAIS_IGUAL
 %nonassoc '<' '>'
 %left '+' '-'
 %left '*' '/' '%'
@@ -150,6 +164,7 @@ CMD : CMD_LET ';'
       { $$.c = $2.c + "println" + "#"; }
     | CMD_FOR
     | E ';'
+      { $$.c = $1.c + "^"; }
     ;
  
 CMD_FOR : FOR '(' PRIM_E ';' E ';' E ')' CMD 
@@ -238,18 +253,18 @@ LVALUEPROP : E '[' E ']' { $$.c = $1.c + $3.c; }
 
 E : LVALUE '=' E 
     { 
-        if (ts.count( $1.c[0] ) < 1) {
-            cout << "Erro: a variável '" << $1.c[0] << "' não foi declarada." << endl; 
-            exit(1);
-        }
-        else if (ts[$1.c[0]].tipo == DeclConst) {
-            cout << "Erro: tentativa de modificar uma variável constante ('" << $1.c[0] << "')." << endl; 
-            exit (1);
-        }
-        $$.c = $1.c + $3.c + "= ^"; 
+      checarVariavelExistente($1);  
+      $$.c = $1.c + $3.c + "="; 
+    }
+  | LVALUE MAIS_IGUAL E
+    {
+      checarVariavelExistente($1);
+      $$.c = $1.c + $1.c + "@" + $3.c + "+ ="; 
     }
   | LVALUEPROP '=' E 
-    { $$.c = $1.c + $3.c + "[=] ^"; }
+    { $$.c = $1.c + $3.c + "[=]"; }
+  | LVALUEPROP MAIS_IGUAL E 
+    { $$.c = $1.c + $1.c + "[@]" + $3.c + "+ [=]"; }
   | E '<' E
     { $$.c = $1.c + $3.c + $2.c; }
   | E '>' E
@@ -275,6 +290,8 @@ E : LVALUE '=' E
     { $$.c = $1.c + "@"; } 
   | LVALUEPROP
     { $$.c = $1.c + "[@]"; }
+  | '(' E ')'
+    { $$.c = $2.c; }
   ;
   
   
