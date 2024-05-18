@@ -107,15 +107,6 @@ void print( vector<string> codigo ) {
   cout << endl;  
 }
 
-void printTabela() {
-
-    for (auto a : ts) 
-        cout << a.first << endl
-             << "Linha: " << a.second.linha << endl
-             << "Coluna: " << a.second.coluna << endl
-             << "Tipo: " << a.second.tipo << endl;
-}
-
 void checarVariavelExistente(Atributos att) {
   // Checa se uma variável que vai ser modificada já existe
   // Se não, retorna erro
