@@ -1,4 +1,7 @@
-let a = 1, b, x;
-x = b = a * (8 + 1.1);
-let c = "hello ";
-c += ", " + 'world' + '!';
+let i = 0, j = -1, x = 9, b = [];
+while( i < x - 2*3 + 2.1 ) {
+  b[i] = j;
+  i = i + 1;
+  j = i / 2.0 + j;
+};
+j = x = 0;
