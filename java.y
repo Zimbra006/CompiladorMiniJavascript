@@ -107,15 +107,19 @@ void print( vector<string> codigo ) {
   cout << endl;  
 }
 
-void checarVariavelExistente(Atributos att) {
-  // Checa se uma variável que vai ser modificada já existe
-  // Se não, retorna erro
-  // Se sim, retorna erro caso tenha sido declarada com const
+void checarVariavelExiste(Atributos att) {
+  // Checa se uma variável que vai ser modificada existe
+  
   if (ts.count( att.c[0] ) < 1) {
     cout << "Erro: a variável '" << att.c[0] << "' não foi declarada." << endl; 
     exit(1);
   }
-  else if (ts[att.c[0]].tipo == DeclConst) {
+  
+}
+
+void checarVariavelConst(Atributos att) {
+  // Checa se uma variável const que já existe está sendo modificada
+  if (ts[att.c[0]].tipo == DeclConst) {
     cout << "Erro: tentativa de modificar uma variável constante ('" << att.c[0] << "')." << endl; 
     exit (1);
   }
@@ -244,12 +248,14 @@ LVALUEPROP : E '[' E ']' { $$.c = $1.c + $3.c; }
 
 E : LVALUE '=' E 
     { 
-      checarVariavelExistente($1);  
+      checarVariavelExiste($1);  
+      checarVariavelConst($1);  
       $$.c = $1.c + $3.c + "="; 
     }
   | LVALUE MAIS_IGUAL E
     {
-      checarVariavelExistente($1);
+      checarVariavelExiste($1);  
+      checarVariavelConst($1);  
       $$.c = $1.c + $1.c + "@" + $3.c + "+ ="; 
     }
   | LVALUEPROP '=' E 
