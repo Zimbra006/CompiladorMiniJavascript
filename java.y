@@ -126,7 +126,7 @@ void checarVariavelConst(Atributos att) {
 }
 %}
 
-%token ID IF ELSE PRINT FOR
+%token ID IF ELSE PRINT FOR WHILE
 %token OBJ ARRAY
 %token LET VAR CONST
 %token CDOUBLE CSTRING CINT
@@ -277,7 +277,15 @@ E : LVALUE '=' E
   | E '%' E
     { $$.c = $1.c + $3.c + $2.c; }
   | CDOUBLE
+  | '+' CDOUBLE
+    { $$.c = $2.c; }
+  | '-' CDOUBLE
+    { $$.c = "0" + $2.c + "-"; }
   | CINT
+  | '+' CINT
+    { $$.c = $2.c; }
+  | '-' CINT
+    { $$.c = "0" + $2.c + "-"; }
   | CSTRING
   | OBJ 
     { $$.c = $1.c; }
