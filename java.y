@@ -134,7 +134,7 @@ void checarVariavelConst(Atributos att) {
 %token MAIS_IGUAL MAIS_MAIS
 
 %right '=' MAIS_IGUAL
-%nonassoc '<' '>'
+%nonassoc '<' '>' MAIS_MAIS
 %left '+' '-'
 %left '*' '/' '%'
 
@@ -173,10 +173,10 @@ CMD_WHILE : WHILE '(' E ')' CMD
             string definicao_lbl_condicao_while = ":" + lbl_condicao_while;
             string definicao_lbl_comando_while = ":" +lbl_comando_while;
 
-            $$.c = definicao_lbl_condicao_while + $3.c +
-                   lbl_comando_while + "?" + lbl_fim_while + "#" +
-                   definicao_lbl_comando_while + $5.c +
-                   lbl_condicao_while + "#" +
+            $$.c = definicao_lbl_condicao_while + $3.c + // Código para a condição
+                   lbl_comando_while + "?" + lbl_fim_while + "#" + // Se a condição for true, vai pro comando
+                   definicao_lbl_comando_while + $5.c + // Código do comando
+                   lbl_condicao_while + "#" + // Volta pra condição
                    definicao_lbl_fim_while;
           }
           ;
@@ -265,60 +265,82 @@ LVALUEPROP : E '[' E ']' { $$.c = $1.c + $3.c; }
            | E '.' ID { $$.c = $1.c + $3.c; }
            ;
 
-E : LVALUE '=' E 
-    { 
-      checarVariavelExiste($1);  
-      checarVariavelConst($1);  
-      $$.c = $1.c + $3.c + "="; 
-    }
-  | LVALUE MAIS_IGUAL E
-    {
-      checarVariavelExiste($1);  
-      checarVariavelConst($1);  
-      $$.c = $1.c + $1.c + "@" + $3.c + "+ ="; 
-    }
-  | LVALUEPROP '=' E 
-    { $$.c = $1.c + $3.c + "[=]"; }
-  | LVALUEPROP MAIS_IGUAL E 
-    { $$.c = $1.c + $1.c + "[@]" + $3.c + "+ [=]"; }
-  | E '<' E
-    { $$.c = $1.c + $3.c + $2.c; }
-  | E '>' E
-    { $$.c = $1.c + $3.c + $2.c; }
-  | E '+' E
-    { $$.c = $1.c + $3.c + $2.c; }
-  | E '-' E
-    { $$.c = $1.c + $3.c + $2.c; }
-  | E '*' E
-    { $$.c = $1.c + $3.c + $2.c; }
-  | E '/' E
-    { $$.c = $1.c + $3.c + $2.c; }
-  | E '%' E
-    { $$.c = $1.c + $3.c + $2.c; }
-  | CDOUBLE
-  | '+' CDOUBLE
-    { $$.c = $2.c; }
-  | '-' CDOUBLE
-    { $$.c = "0" + $2.c + "-"; }
-  | CINT
-  | '+' CINT
-    { $$.c = $2.c; }
-  | '-' CINT
-    { $$.c = "0" + $2.c + "-"; }
-  | CSTRING
-  | OBJ 
-    { $$.c = $1.c; }
-  | ARRAY 
-    { $$.c = $1.c; }
-  | LVALUE 
-    { $$.c = $1.c + "@"; } 
-  | LVALUEPROP
-    { $$.c = $1.c + "[@]"; }
+E : ATRIB
+  | BOOL
+  | MATH
+  | VALUES
   | '(' E ')'
     { $$.c = $2.c; }
   ;
   
-  
+// Lidam apenas com atribuições
+ATRIB: LVALUE '=' E 
+      { 
+        checarVariavelExiste($1);  
+        checarVariavelConst($1);  
+        $$.c = $1.c + $3.c + "="; 
+      }
+     | LVALUE MAIS_IGUAL E
+      {
+        checarVariavelExiste($1);  
+        checarVariavelConst($1);  
+        $$.c = $1.c + $1.c + "@" + $3.c + "+ ="; 
+      }
+     | LVALUE MAIS_MAIS
+      {
+        checarVariavelExiste($1);  
+        checarVariavelConst($1);  
+        $$.c = $1.c + "@" + $1.c + $1.c + "@ 1 + = ^"; 
+      }
+     | LVALUEPROP '=' E 
+      { $$.c = $1.c + $3.c + "[=]"; }
+     | LVALUEPROP MAIS_IGUAL E 
+      { $$.c = $1.c + $1.c + "[@]" + $3.c + "+ [=]"; }
+     | LVALUEPROP MAIS_MAIS
+      { $$.c = $1.c + "@" + $1.c + $1.c + "@ 1 + [=] ^"; }
+     ;
+
+// Lidam apenas com comparações booleanas
+BOOL: E '<' E
+     { $$.c = $1.c + $3.c + $2.c; }
+    | E '>' E
+     { $$.c = $1.c + $3.c + $2.c; }
+    ;
+
+// Lidam apenas com expressões matemáticas
+MATH: E '+' E
+      { $$.c = $1.c + $3.c + $2.c; }
+    | E '-' E
+      { $$.c = $1.c + $3.c + $2.c; }
+    | E '*' E
+      { $$.c = $1.c + $3.c + $2.c; }
+    | E '/' E
+      { $$.c = $1.c + $3.c + $2.c; }
+    | E '%' E
+      { $$.c = $1.c + $3.c + $2.c; }
+    ;
+
+// Lidam apenas com valores constantes ou variáveis
+VALUES: CDOUBLE
+      | '+' CDOUBLE
+        { $$.c = $2.c; }
+      | '-' CDOUBLE
+        { $$.c = "0" + $2.c + "-"; }
+      | CINT
+      | '+' CINT
+        { $$.c = $2.c; }
+      | '-' CINT
+        { $$.c = "0" + $2.c + "-"; }
+      | CSTRING
+      | OBJ 
+        { $$.c = $1.c; }
+      | ARRAY 
+        { $$.c = $1.c; }
+      | LVALUE 
+        { $$.c = $1.c + "@"; } 
+      | LVALUEPROP
+        { $$.c = $1.c + "[@]"; }
+      ;
 %%
 
 #include "lex.yy.c"
