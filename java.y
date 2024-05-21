@@ -167,8 +167,9 @@ CMD : CMD_LET ';'
     | CMD_FOR
     | E ';'
       { $$.c = $1.c + "^"; }
-    | '{' CMDs '}' ';'
+    | '{' CMDs '}'
       { $$.c = $2.c; }
+    | ';' { $$.c.clear(); }
     ;
 
 CMD_WHILE : WHILE '(' E ')' CMD
