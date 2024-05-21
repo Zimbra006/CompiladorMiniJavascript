@@ -136,6 +136,8 @@ void checarVariavelConst(Atributos att) {
 %right '=' MAIS_IGUAL
 %nonassoc '<' '>' MAIS_MAIS
 %nonassoc  AND OR ME_IG MA_IG DIF IGUAL
+  /* Esses três são adicionados para resolver o conflito */
+  /* shift-reduce no yacc */
 %nonassoc IF
 %nonassoc REDUCE
 %nonassoc ELSE
