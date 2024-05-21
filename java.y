@@ -100,8 +100,11 @@ void insere_tabela_de_simbolos( TipoDecl decl, Atributos att) {
 }
 
 void print( vector<string> codigo ) {
-  for( auto s : codigo )
-    cout << s << " ";
+  int inc = 1;
+  for( int i = 0; i < codigo.size(); i++ ) {
+    if (codigo[i] == "") { inc--; continue; } 
+    cout << i + inc << ": " << codigo[i] << endl;
+  }
     
   cout << endl;  
 }
@@ -125,15 +128,17 @@ void checarVariavelConst(Atributos att) {
 }
 %}
 
-%token ID IF ELSE PRINT FOR WHILE
+%token ID PRINT FOR WHILE
 %token OBJ ARRAY
 %token LET VAR CONST
 %token CDOUBLE CSTRING CINT
-%token AND OR ME_IG MA_IG DIF IGUAL
-%token MAIS_IGUAL MAIS_MAIS
 
 %right '=' MAIS_IGUAL
 %nonassoc '<' '>' MAIS_MAIS
+%nonassoc  AND OR ME_IG MA_IG DIF IGUAL
+%nonassoc IF
+%nonassoc REDUCE
+%nonassoc ELSE
 %left '+' '-'
 %left '*' '/' '%'
 
@@ -242,7 +247,20 @@ VAR_R_CONST : ID
       { $$.c = $1.c + "&" + $1.c + $3.c + "=" + "^"; insere_tabela_de_simbolos(DeclConst, $1);}
     ;
      
-CMD_IF : IF '(' E ')' CMD ELSE CMD
+CMD_IF : IF '(' E ')' CMD %prec REDUCE
+         { string lbl_true = gera_label( "lbl_true" );
+           string lbl_fim_if = gera_label( "lbl_fim_if" );
+           string definicao_lbl_true = ":" + lbl_true;
+           string definicao_lbl_fim_if = ":" + lbl_fim_if;
+                    
+            $$.c = $3.c +                       // Codigo da expressão
+                   lbl_true + "?" +             // Código do IF
+                   lbl_fim_if + "#" +           // Código do False
+                   definicao_lbl_true + $5.c +  // Código do True
+                   definicao_lbl_fim_if         // Fim do IF
+                   ;
+         }
+       | IF '(' E ')' CMD ELSE CMD
          { string lbl_true = gera_label( "lbl_true" );
            string lbl_fim_if = gera_label( "lbl_fim_if" );
            string definicao_lbl_true = ":" + lbl_true;
@@ -256,7 +274,7 @@ CMD_IF : IF '(' E ')' CMD ELSE CMD
                    ;
          }
        ;
-        
+
 LVALUE : ID 
        ;
        
@@ -274,20 +292,20 @@ E : LVALUE '=' E
     {
       checarVariavelExiste($1);  
       checarVariavelConst($1);  
-      $$.c = $1.c + $1.c + "@" + $3.c + "+ ="; 
+      $$.c = $1.c + $1.c + "@" + $3.c + "+" + "="; 
     }
   | LVALUE MAIS_MAIS
     {
       checarVariavelExiste($1);  
       checarVariavelConst($1);  
-      $$.c = $1.c + "@" + $1.c + $1.c + "@ 1 + = ^"; 
+      $$.c = $1.c + "@" + $1.c + $1.c + "@" + "1" + "+" + "=" + "^"; 
     }
   | LVALUEPROP '=' E 
     { $$.c = $1.c + $3.c + "[=]"; }
   | LVALUEPROP MAIS_IGUAL E 
-    { $$.c = $1.c + $1.c + "[@]" + $3.c + "+ [=]"; }
+    { $$.c = $1.c + $1.c + "[@]" + $3.c + "+" + "[=]"; }
   | LVALUEPROP MAIS_MAIS 
-    { $$.c = $1.c + "[@]" + $1.c + $1.c + "[@] 1 + [=] ^"; }
+    { $$.c = $1.c + "[@]" + $1.c + $1.c + "[@]" + "1" + "+" + "=" + "^"; }
   | E '<' E
     { $$.c = $1.c + $3.c + $2.c; }
   | E '>' E
