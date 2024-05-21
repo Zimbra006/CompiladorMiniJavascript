@@ -99,33 +99,41 @@ void insere_tabela_de_simbolos( TipoDecl decl, Atributos att) {
 
 }
 
-
 void print( vector<string> codigo ) {
-  for( string s : codigo )
+  for( auto s : codigo )
     cout << s << " ";
     
   cout << endl;  
 }
 
-void printTabela() {
+void checarVariavelExiste(Atributos att) {
+  // Checa se uma variável que vai ser modificada existe
+  
+  if (ts.count( att.c[0] ) < 1) {
+    cout << "Erro: a variável '" << att.c[0] << "' não foi declarada." << endl; 
+    exit(1);
+  }
+  
+}
 
-    for (auto a : ts) 
-        cout << a.first << endl
-             << "Linha: " << a.second.linha << endl
-             << "Coluna: " << a.second.coluna << endl
-             << "Tipo: " << a.second.tipo << endl;
-    }
+void checarVariavelConst(Atributos att) {
+  // Checa se uma variável const que já existe está sendo modificada
+  if (ts[att.c[0]].tipo == DeclConst) {
+    cout << "Erro: tentativa de modificar uma variável constante ('" << att.c[0] << "')." << endl; 
+    exit (1);
+  }
+}
 %}
 
-%token ID IF ELSE PRINT FOR
+%token ID IF ELSE PRINT FOR WHILE
 %token OBJ ARRAY
 %token LET VAR CONST
 %token CDOUBLE CSTRING CINT
 %token AND OR ME_IG MA_IG DIF IGUAL
 %token MAIS_IGUAL MAIS_MAIS
 
-%right '='
-%nonassoc '<' '>'
+%right '=' MAIS_IGUAL
+%nonassoc '<' '>' MAIS_MAIS
 %left '+' '-'
 %left '*' '/' '%'
 
@@ -135,10 +143,10 @@ void printTabela() {
 
 %%
 
-S : CMDs { print( resolve_enderecos( $1.c + "\n." ) ); }
+S : CMDs { print( resolve_enderecos( $1.c + "." ) ); }
   ;
 
-CMDs : CMDs CMD  { $$.c =  $1.c + "\n" + $2.c ; };
+CMDs : CMDs CMD  { $$.c =  $1.c + $2.c ; };
      | CMD
      ;
      
@@ -148,9 +156,29 @@ CMD : CMD_LET ';'
     | CMD_IF 
     | PRINT E ';' 
       { $$.c = $2.c + "println" + "#"; }
+    | CMD_WHILE
     | CMD_FOR
     | E ';'
+      { $$.c = $1.c + "^"; }
+    | '{' CMDs '}' ';'
+      { $$.c = $2.c; }
     ;
+
+CMD_WHILE : WHILE '(' E ')' CMD
+          { string lbl_fim_while = gera_label( "fim_while" );
+            string lbl_condicao_while = gera_label( "condicao_while" );
+            string lbl_comando_while = gera_label( "comando_while" );
+            string definicao_lbl_fim_while = ":" + lbl_fim_while;
+            string definicao_lbl_condicao_while = ":" + lbl_condicao_while;
+            string definicao_lbl_comando_while = ":" +lbl_comando_while;
+
+            $$.c = definicao_lbl_condicao_while + $3.c +
+                   lbl_comando_while + "?" + lbl_fim_while + "#" +
+                   definicao_lbl_comando_while + $5.c +
+                   lbl_condicao_while + "#" +
+                   definicao_lbl_fim_while;
+          }
+          ;
  
 CMD_FOR : FOR '(' PRIM_E ';' E ';' E ')' CMD 
         { string lbl_fim_for = gera_label( "fim_for" );
@@ -238,18 +266,28 @@ LVALUEPROP : E '[' E ']' { $$.c = $1.c + $3.c; }
 
 E : LVALUE '=' E 
     { 
-        if (ts.count( $1.c[0] ) < 1) {
-            cout << "Erro: a variável '" << $1.c[0] << "' não foi declarada." << endl; 
-            exit(1);
-        }
-        else if (ts[$1.c[0]].tipo == DeclConst) {
-            cout << "Erro: tentativa de modificar uma variável constante ('" << $1.c[0] << "')." << endl; 
-            exit (1);
-        }
-        $$.c = $1.c + $3.c + "= ^"; 
+      checarVariavelExiste($1);  
+      checarVariavelConst($1);  
+      $$.c = $1.c + $3.c + "="; 
+    }
+  | LVALUE MAIS_IGUAL E
+    {
+      checarVariavelExiste($1);  
+      checarVariavelConst($1);  
+      $$.c = $1.c + $1.c + "@" + $3.c + "+ ="; 
+    }
+  | LVALUE MAIS_MAIS
+    {
+      checarVariavelExiste($1);  
+      checarVariavelConst($1);  
+      $$.c = $1.c + "@" + $1.c + $1.c + "@ 1 + = ^"; 
     }
   | LVALUEPROP '=' E 
-    { $$.c = $1.c + $3.c + "[=] ^"; }
+    { $$.c = $1.c + $3.c + "[=]"; }
+  | LVALUEPROP MAIS_IGUAL E 
+    { $$.c = $1.c + $1.c + "[@]" + $3.c + "+ [=]"; }
+  | LVALUEPROP MAIS_MAIS 
+    { $$.c = $1.c + "[@]" + $1.c + $1.c + "[@] 1 + [=] ^"; }
   | E '<' E
     { $$.c = $1.c + $3.c + $2.c; }
   | E '>' E
@@ -265,7 +303,15 @@ E : LVALUE '=' E
   | E '%' E
     { $$.c = $1.c + $3.c + $2.c; }
   | CDOUBLE
+  | '+' CDOUBLE
+    { $$.c = $2.c; }
+  | '-' CDOUBLE
+    { $$.c = "0" + $2.c + "-"; }
   | CINT
+  | '+' CINT
+    { $$.c = $2.c; }
+  | '-' CINT
+    { $$.c = "0" + $2.c + "-"; }
   | CSTRING
   | OBJ 
     { $$.c = $1.c; }
@@ -275,6 +321,8 @@ E : LVALUE '=' E
     { $$.c = $1.c + "@"; } 
   | LVALUEPROP
     { $$.c = $1.c + "[@]"; }
+  | '(' E ')'
+    { $$.c = $2.c; }
   ;
   
   
