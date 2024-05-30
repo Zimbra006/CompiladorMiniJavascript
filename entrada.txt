@@ -1,10 +1,6 @@
-let a = "ABA", c = 'CATE', resultado;
-if( a == c )
-  resultado = "Ta' errado!";
-else if( a < c ) 
-{
-  resultado = "a vem antes de c: ";
-  resultado += a + '<' + c ;
+function mdc( a, b ) {
+  if( b == 0 )
+    return a;
+  else
+    return mdc( b, a % b );
 }
-else
-  resultado = "Deu ruim!";

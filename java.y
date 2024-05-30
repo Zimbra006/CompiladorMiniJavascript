@@ -13,21 +13,41 @@ struct Atributos {
 
   int linha = 0, coluna = 0;
 
+  // Só para argumentos e parâmetros
+  int contador = 0;     
+  
+  // Só para valor default de argumento        
+  vector<string> valor_default; 
+
   void clear() {
     c.clear();
+    valor_default.clear();
     linha = 0;
     coluna = 0;
+    contador = 0;
   }
 };
 
 enum TipoDecl { DeclVar = 200, DeclConst, DeclLet };
-
-struct Var {
-  int linha, coluna;
-  TipoDecl tipo;
+map<TipoDecl, string> nomeTipoDecl = { 
+  { DeclLet, "let" }, 
+  { DeclConst, "const" }, 
+  { DeclVar, "var" }
 };
 
-map<string,Var> ts; // Tabela de Símbolos
+struct Simbolo {
+  TipoDecl tipo;
+  int linha;
+  int coluna;
+};
+
+int in_func = 0;
+
+// Tabela de símbolos - agora é uma pilha
+vector< map< string, Simbolo > > ts = { map< string, Simbolo >{} }; 
+
+// Guarda as instruções para a execução de funções
+vector<string> funcoes;
 
 #define YYSTYPE Atributos
 
@@ -74,29 +94,45 @@ string gera_label( string prefixo ) {
   return prefixo + "_" + to_string( ++n ) + ":";
 }
 
-void insere_tabela_de_simbolos( TipoDecl decl, Atributos att) {
+// Funções dadas pelo professor
+// Substitui insere_tabela_de_simbolos
+vector<string> declara_var( TipoDecl tipo, string nome, int linha, int coluna ) {
 
-    if (ts.count( att.c[0] ) > 0) {
-        if (ts[att.c[0]].tipo == DeclConst) {
-            cout << "Erro: tentativa de modificar uma variável constante ('" << att.c[0] << "')." << endl;
-            exit( 1 );
-        }
-        if (ts[att.c[0]].tipo == DeclLet || decl == DeclLet) {
-            cout << "Erro: a variável '" << att.c[0] << "' ja foi declarada na linha " << ts[att.c[0]].linha << "." << endl;
-            exit( 1 );
-        }
+  auto& topo = ts.back();   
+       
+  if( topo.count( nome ) == 0 ) {
+    topo[nome] = Simbolo{ tipo, linha, coluna };
+    return vector<string>{ nome, "&" };
+  }
+  else if( tipo == DeclVar && topo[nome].tipo == DeclVar ) {
+    topo[nome] = Simbolo{ tipo, linha, coluna };
+    return vector<string>{};
+  } 
+  else {
+    cerr << "Redeclaração de '" << nomeTipoDecl[topo[nome].tipo] << " " << nome 
+         << "' na linha: " << topo[nome].linha 
+         << ", coluna: " << topo[nome].coluna << endl;
+    exit( 1 );     
+  }
+}
+// Substitui ambas as funções checarVariavel
+void checa_simbolo( string nome, bool modificavel ) {
+
+  for( int i = ts.size() - 1; i >= 0; i-- ) {  
+    auto& atual = ts[i];
+    
+    if( atual.count( nome ) > 0 ) {
+      if( modificavel && atual[nome].tipo == DeclConst ) {
+        cerr << "Variavel '" << nome << "' não pode ser modificada." << endl;
+        exit( 1 );     
+      }
+      else 
         return;
     }
+  }
 
-    ts.insert({
-            att.c[0],
-            Var {
-                att.linha,
-                att.coluna,
-                decl
-            }
-    });
-
+  cerr << "Variavel '" << nome << "' não declarada." << endl;
+  exit( 1 );     
 }
 
 void print( vector<string> codigo ) {
@@ -108,29 +144,11 @@ void print( vector<string> codigo ) {
     
   cout << endl;  
 }
-
-void checarVariavelExiste(Atributos att) {
-  // Checa se uma variável que vai ser modificada existe
-  
-  if (ts.count( att.c[0] ) < 1) {
-    cout << "Erro: a variável '" << att.c[0] << "' não foi declarada." << endl; 
-    exit(1);
-  }
-  
-}
-
-void checarVariavelConst(Atributos att) {
-  // Checa se uma variável const que já existe está sendo modificada
-  if (ts[att.c[0]].tipo == DeclConst) {
-    cout << "Erro: tentativa de modificar uma variável constante ('" << att.c[0] << "')." << endl; 
-    exit (1);
-  }
-}
 %}
 
 %token ID PRINT FOR WHILE
 %token OBJ ARRAY
-%token LET VAR CONST
+%token LET VAR CONST FUNCTION
 %token CDOUBLE CSTRING CINT
 
 %right '=' MAIS_IGUAL
@@ -144,13 +162,13 @@ void checarVariavelConst(Atributos att) {
 %left '+' '-'
 %left '*' '/' '%'
 
-%left '['
+%right '[' '('
 %left '.'
 
 
 %%
 
-S : CMDs { print( resolve_enderecos( $1.c + "." ) ); }
+S : CMDs { print( resolve_enderecos( $1.c + "." + funcoes ) ); }
   ;
 
 CMDs : CMDs CMD  { $$.c =  $1.c + $2.c ; };
@@ -161,15 +179,74 @@ CMD : CMD_LET ';'
     | CMD_VAR ';'
     | CMD_CONST ';'
     | CMD_IF 
+    | CMD_FUNC
     | PRINT E ';' 
       { $$.c = $2.c + "println" + "#"; }
     | CMD_WHILE
     | CMD_FOR
     | E ';'
       { $$.c = $1.c + "^"; }
-    | '{' CMDs '}'
-      { $$.c = $2.c; }
+    | '{' EMPILHA_TS CMDs '}'
+      { ts.pop_back(); $$.c = "<{" + $3.c + "}>"; }
     | ';' { $$.c.clear(); }
+    ;
+
+// Símbolo apenas para empilhar tabelas de símbolos
+EMPILHA_TS : { ts.push_back( map< string, Simbolo >{} ); } 
+           ;
+
+CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); } 
+             '(' EMPILHA_TS LISTA_PARAMs ')' '{' CMDs '}'
+           { 
+             string lbl_endereco_funcao = gera_label( "func_" + $2.c[0] );
+             string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
+             
+             $$.c = $2.c + "&" + $2.c + "{}"  + "=" + "'&funcao'" +
+                    lbl_endereco_funcao + "[=]" + "^";
+             funcoes = funcoes + definicao_lbl_endereco_funcao + $6.c + $9.c +
+                       "undefined" + "@" + "'&retorno'" + "@"+ "~";
+             ts.pop_back(); 
+           }
+         ;
+         
+LISTA_PARAMs : PARAMs
+           | { $$.clear(); }
+           ;
+           
+PARAMs : PARAMs ',' PARAM  
+       {  
+         $$.c = $1.c + $3.c + "&" + $3.c + "arguments" + "@" + to_string( $1.contador )
+                + "[@]" + "=" + "^"; 
+                
+         if( $3.valor_default.size() > 0 ) {
+           // Gerar código para testar valor default.
+         }
+         $$.contador = $1.contador + $3.contador; 
+       }
+     | PARAM 
+       {  
+         $$.c = $1.c + "&" + $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^"; 
+                
+         if( $1.valor_default.size() > 0 ) {
+           // Gerar código para testar valor default.
+         }
+         $$.contador = $1.contador; 
+       }
+     ;
+     
+PARAM : ID 
+      { $$.c = $1.c;      
+        $$.contador = 1;
+        $$.valor_default.clear();
+        declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ); 
+      }
+    | ID '=' E
+      { // Código do IF
+        $$.c = $1.c;
+        $$.contador = 1;
+        $$.valor_default = $3.c;         
+        declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ); 
+      }
     ;
 
 CMD_WHILE : WHILE '(' E ')' CMD
@@ -248,34 +325,32 @@ CMD_VAR : VAR VARs_VAR {  $$.c = $2.c;}
 CMD_CONST : CONST VARs_CONST {  $$.c = $2.c;}
           ;
 
-VARs_LET : VAR_R_LET ',' VARs_LET { $$.c = $1.c + $3.c; } 
-     | VAR_R_LET
+VARs_LET : VAR_LET ',' VARs_LET { $$.c = $1.c + $3.c; } 
+     | VAR_LET
      ;
 
-VARs_VAR : VAR_R_VAR ',' VARs_VAR { $$.c = $1.c + $3.c; } 
-     | VAR_R_VAR
+VARs_VAR : VAR_VAR ',' VARs_VAR { $$.c = $1.c + $3.c; } 
+     | VAR_VAR
      ;
 
-VARs_CONST : VAR_R_CONST ',' VARs_CONST { $$.c = $1.c + $3.c; } 
-     | VAR_R_CONST
+VARs_CONST : VAR_CONST ',' VARs_CONST { $$.c = $1.c + $3.c; } 
+     | VAR_CONST
      ;
 
-VAR_R_LET : ID  
-      { $$.c = $1.c + "&"; insere_tabela_de_simbolos(DeclLet, $1);}
+VAR_LET : ID  
+      { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna );}
     | ID '=' E
-      { $$.c = $1.c + "&" + $1.c + $3.c + "=" + "^"; insere_tabela_de_simbolos(DeclLet, $1);}
+      { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
     ;
 
-VAR_R_VAR : ID  
-      { $$.c = $1.c + "&"; insere_tabela_de_simbolos(DeclVar, $1); }
+VAR_VAR : ID  
+      { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna )}
     | ID '=' E
-      { $$.c = $1.c + "&" + $1.c + $3.c + "=" + "^"; insere_tabela_de_simbolos(DeclVar, $1); }
+      { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
     ;
 
-VAR_R_CONST : ID  
-      { $$.c = $1.c + "&"; insere_tabela_de_simbolos(DeclConst, $1);}
-    | ID '=' E
-      { $$.c = $1.c + "&" + $1.c + $3.c + "=" + "^"; insere_tabela_de_simbolos(DeclConst, $1);}
+VAR_CONST : ID '=' E
+      { $$.c = declara_var( DeclConst, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^"; }
     ;
 
 LVALUE : ID 
@@ -290,25 +365,26 @@ E : ATRIB
   | MATH
   | VALUES
   | '(' E ')' { $$.c = $2.c; }
+  | E '(' LISTA_ARGs ')'
+    {
+      $$.c = $3.c + to_string( $3.contador ) + $1.c + "$";
+    }
   ;
 
   /* Lida apenas com atribuições */
 ATRIB : LVALUE '=' E 
         { 
-          checarVariavelExiste($1);  
-          checarVariavelConst($1);  
+          checa_simbolo( $1.c[0], true );  
           $$.c = $1.c + $3.c + "="; 
         }
       | LVALUE MAIS_IGUAL E
         {
-          checarVariavelExiste($1);  
-          checarVariavelConst($1);  
+          checa_simbolo( $1.c[0], true );  
           $$.c = $1.c + $1.c + "@" + $3.c + "+" + "="; 
         }
       | LVALUE MAIS_MAIS
         {
-          checarVariavelExiste($1);  
-          checarVariavelConst($1);  
+          checa_simbolo( $1.c[0], true );  
           $$.c = $1.c + "@" + $1.c + $1.c + "@" + "1" + "+" + "=" + "^"; 
         }
       | LVALUEPROP '=' E 
@@ -371,14 +447,27 @@ VALUES: CDOUBLE
       | LVALUEPROP
         { $$.c = $1.c + "[@]"; }
       ;
+
+LISTA_ARGs : ARGs
+           | { $$.clear(); }
+           ;
+             
+ARGs : ARGs ',' E
+       { $$.c = $1.c + $3.c;
+         $$.contador = $1.contador + $3.contador; }
+     | E
+       { $$.c = $1.c;
+         $$.contador = 1; }
+     ;
+
 %%
 
 #include "lex.yy.c"
 
 void yyerror( const char* st ) {
-   puts( st ); 
-   printf( "Proximo a: %s\n", yytext );
-   exit( 0 );
+   cerr << st << endl; 
+   cerr << "Proximo a: " << yytext << endl;
+   exit( 1 );
 }
 
 int main( int argc, char* argv[] ) {
