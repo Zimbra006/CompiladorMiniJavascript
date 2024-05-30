@@ -136,7 +136,7 @@ void checa_simbolo( string nome, bool modificavel ) {
 }
 
 void print( vector<string> codigo ) {
-  int inc = 1;
+  int inc = 0;
   for( int i = 0; i < codigo.size(); i++ ) {
     if (codigo[i] == "") { inc--; continue; } 
     cout << i + inc << ": " << codigo[i] << endl;
@@ -147,8 +147,7 @@ void print( vector<string> codigo ) {
 %}
 
 %token ID PRINT FOR WHILE
-%token OBJ ARRAY
-%token LET VAR CONST FUNCTION
+%token LET VAR CONST FUNCTION RETURN
 %token CDOUBLE CSTRING CINT
 
 %right '=' MAIS_IGUAL
@@ -180,6 +179,7 @@ CMD : CMD_LET ';'
     | CMD_CONST ';'
     | CMD_IF 
     | CMD_FUNC
+    | CMD_RET ';'
     | PRINT E ';' 
       { $$.c = $2.c + "println" + "#"; }
     | CMD_WHILE
@@ -208,7 +208,10 @@ CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); }
              ts.pop_back(); 
            }
          ;
-         
+
+CMD_RET : RETURN E { $$.c = $2.c + "'&retorno'" + "@"+ "~"; }
+        ;
+
 LISTA_PARAMs : PARAMs
            | { $$.clear(); }
            ;
@@ -344,7 +347,7 @@ VAR_LET : ID
     ;
 
 VAR_VAR : ID  
-      { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna )}
+      { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ); }
     | ID '=' E
       { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
     ;
@@ -372,7 +375,17 @@ E : ATRIB
   ;
 
   /* Lida apenas com atribuições */
-ATRIB : LVALUE '=' E 
+ATRIB : LVALUE '=' '{' '}'
+        { 
+          checa_simbolo( $1.c[0], true ); 
+          $$.c = $1.c + "{}" + "="; 
+        }
+      | LVALUE '=' '[' ']'
+        { 
+          checa_simbolo( $1.c[0], true ); 
+          $$.c = $1.c + "[]" + "="; 
+        }
+      |  LVALUE '=' E 
         { 
           checa_simbolo( $1.c[0], true );  
           $$.c = $1.c + $3.c + "="; 
@@ -387,6 +400,10 @@ ATRIB : LVALUE '=' E
           checa_simbolo( $1.c[0], true );  
           $$.c = $1.c + "@" + $1.c + $1.c + "@" + "1" + "+" + "=" + "^"; 
         }
+      | LVALUEPROP '=' '{' '}'
+        { $$.c = $1.c + "{}" + "[=]"; }
+      | LVALUEPROP '=' '[' ']'
+        { $$.c = $1.c + "[]" + "[=]"; }
       | LVALUEPROP '=' E 
         { $$.c = $1.c + $3.c + "[=]"; }
       | LVALUEPROP MAIS_IGUAL E 
@@ -438,10 +455,10 @@ VALUES: CDOUBLE
       | '-' CINT
         { $$.c = "0" + $2.c + "-"; }
       | CSTRING
-      | OBJ 
-        { $$.c = $1.c; }
-      | ARRAY 
-        { $$.c = $1.c; }
+      | '(' '{' '}' ')'
+        { $_$.c = vector{"{}"}; }
+      | '(' '[' ']' ')'
+        { $_$.c = vector{"[]"}; }
       | LVALUE 
         { $$.c = $1.c + "@"; } 
       | LVALUEPROP
@@ -454,7 +471,7 @@ LISTA_ARGs : ARGs
              
 ARGs : ARGs ',' E
        { $$.c = $1.c + $3.c;
-         $$.contador = $1.contador + $3.contador; }
+         $$.contador = $1.contador + 1; }
      | E
        { $$.c = $1.c;
          $$.contador = 1; }
@@ -466,7 +483,7 @@ ARGs : ARGs ',' E
 
 void yyerror( const char* st ) {
    cerr << st << endl; 
-   cerr << "Proximo a: " << yytext << endl;
+   cerr << "Proximo a: " << yytext << ", linha: " << yylval.linha << endl;
    exit( 1 );
 }
 

@@ -47,9 +47,7 @@ ID        {L}({L}|{D})*
 "for"      { return token( FOR ); }
 "while"    { return token( WHILE ); }
 "function" { return token( FUNCTION ); }
-
-"{}"       { return token( OBJ ); }
-"[]"       { return token( ARRAY ); }
+"return"   { return token( RETURN ); }
 
 {ID}       { return token( ID ); }
 
