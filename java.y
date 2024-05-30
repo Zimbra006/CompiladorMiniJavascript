@@ -210,6 +210,7 @@ CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); }
          ;
 
 CMD_RET : RETURN E { $$.c = $2.c + "'&retorno'" + "@"+ "~"; }
+        | RETURN { $$.c = vector<string>{"undefined", "@", "'&retorno'", "@", "~"}; }
         ;
 
 LISTA_PARAMs : PARAMs
@@ -344,16 +345,22 @@ VAR_LET : ID
       { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna );}
     | ID '=' E
       { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
+    | ID '=' '{' '}'
+      { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + "{}" + "=" + "^";}
     ;
 
 VAR_VAR : ID  
       { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ); }
     | ID '=' E
       { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
+    | ID '=' '{' '}'
+      { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ) + $1.c + "{}" + "=" + "^";}
     ;
 
 VAR_CONST : ID '=' E
       { $$.c = declara_var( DeclConst, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^"; }
+          | ID '=' '{' '}'
+      { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + "{}" + "=" + "^";}
     ;
 
 LVALUE : ID 
@@ -456,9 +463,9 @@ VALUES: CDOUBLE
         { $$.c = "0" + $2.c + "-"; }
       | CSTRING
       | '(' '{' '}' ')'
-        { $_$.c = vector{"{}"}; }
-      | '(' '[' ']' ')'
-        { $_$.c = vector{"[]"}; }
+        { $$.c = vector<string>{"{}"}; }
+      | '[' ']'
+        { $$.c = vector<string>{"[]"}; }
       | LVALUE 
         { $$.c = $1.c + "@"; } 
       | LVALUEPROP
