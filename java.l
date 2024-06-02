@@ -24,10 +24,10 @@ ASM       "asm{"
 
 "\t"       { coluna += 4; }
 " "        { coluna++; }
-"\n"	   { linha++; coluna = 1; }
+"\n"	     { linha++; coluna = 1; }
 
 {DOUBLE}   { return token( CDOUBLE ); }
-{INT}	   { return token( CINT ); } 
+{INT}	     { return token( CINT ); } 
 {STRING_S} { return token( CSTRING ); }
 {STRING_D} { return token( CSTRING ); }
 
@@ -58,6 +58,8 @@ ASM       "asm{"
 .          { return token( *yytext ); }
 
   /* Regras exclusivas para asm */
+
+<asm>[ \t\n] ;
 
 <asm>"{}" |
 <asm>"}>" |
