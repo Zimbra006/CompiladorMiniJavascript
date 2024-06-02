@@ -146,7 +146,7 @@ void print( vector<string> codigo ) {
 }
 %}
 
-%token ID PRINT FOR WHILE
+%token ID PRINT FOR WHILE ASM ASM_WORD
 %token LET VAR CONST FUNCTION RETURN
 %token CDOUBLE CSTRING CINT
 
@@ -180,6 +180,8 @@ CMD : CMD_LET ';' OPT_SC
     | CMD_IF OPT_SC
     | CMD_FUNC OPT_SC
     | CMD_RET OPT_SC
+    | E CMD_ASM ';' OPT_SC 
+      { $$.c = $1.c + $2.c; }
     | PRINT E ';' OPT_SC
       { $$.c = $2.c + "println" + "#"; }
     | CMD_WHILE OPT_SC
@@ -197,6 +199,13 @@ OPT_SC : OPT_SC ';'
 
 // Símbolo apenas para empilhar tabelas de símbolos
 EMPILHA_TS : { ts.push_back( map< string, Simbolo >{} ); } 
+           ;
+
+CMD_ASM : ASM ASM_STRING '}' { $$.c = $2.c + "^"; }
+        ;
+
+ASM_STRING : ASM_WORD ASM_STRING { $$.c = $1.c + $2.c;}
+           | { $$.clear(); }
            ;
 
 CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); } 

@@ -3,7 +3,7 @@ int token( int tk );
 %}
 
 D  	    [0-9]
-L   	[A-Za-z_]
+L   	  [A-Za-z_]
 
 D_ASPAS_S   "''"
 B_ASPAS_S  "\\'"
@@ -16,6 +16,9 @@ DOUBLE    {D}+"."{D}+([Ee][+\-]?{D}+)?
 STRING_S  '([^'\n]|{D_ASPAS_S}|{B_ASPAS_S})*'
 STRING_D  \"([^"\n]|{D_ASPAS_D}|{B_ASPAS_D})*\"
 ID        {L}({L}|{D})*
+ASM       "asm{"
+
+%x asm
 
 %%
 
@@ -48,10 +51,20 @@ ID        {L}({L}|{D})*
 "while"    { return token( WHILE ); }
 "function" { return token( FUNCTION ); }
 "return"   { return token( RETURN ); }
+{ASM}      { BEGIN asm; return token( ASM ); }
 
 {ID}       { return token( ID ); }
 
 .          { return token( *yytext ); }
+
+  /* Regras exclusivas para asm */
+
+<asm>"{}" |
+<asm>"}>" |
+<asm>[^} \t\n]*   { return token( ASM_WORD ); }
+
+<asm>"}"  { BEGIN INITIAL; return token( *yytext ); }
+
 
 %%
 
