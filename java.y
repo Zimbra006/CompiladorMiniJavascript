@@ -174,22 +174,26 @@ CMDs : CMDs CMD  { $$.c =  $1.c + $2.c ; };
      | CMD
      ;
      
-CMD : CMD_LET ';'
-    | CMD_VAR ';'
-    | CMD_CONST ';'
-    | CMD_IF 
-    | CMD_FUNC
-    | CMD_RET ';'
-    | PRINT E ';' 
+CMD : CMD_LET ';' OPT_SC
+    | CMD_VAR ';' OPT_SC
+    | CMD_CONST ';' OPT_SC
+    | CMD_IF OPT_SC
+    | CMD_FUNC OPT_SC
+    | CMD_RET OPT_SC
+    | PRINT E ';' OPT_SC
       { $$.c = $2.c + "println" + "#"; }
-    | CMD_WHILE
-    | CMD_FOR
-    | E ';'
+    | CMD_WHILE OPT_SC
+    | CMD_FOR OPT_SC
+    | E ';' OPT_SC
       { $$.c = $1.c + "^"; }
-    | '{' EMPILHA_TS CMDs '}'
+    | '{' EMPILHA_TS CMDs '}' OPT_SC
       { ts.pop_back(); $$.c = "<{" + $3.c + "}>"; }
-    | ';' { $$.c.clear(); }
     ;
+
+// Símbolo para ponto e vírgula opcionais
+OPT_SC : OPT_SC ';'
+       | {$$.clear(); }
+       ;
 
 // Símbolo apenas para empilhar tabelas de símbolos
 EMPILHA_TS : { ts.push_back( map< string, Simbolo >{} ); } 
