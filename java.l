@@ -46,7 +46,6 @@ ASM       "asm{"
 "const"    { return token( CONST ); }
 "if"       { return token( IF ); }
 "else"     { return token( ELSE ); }
-"print"    { return token( PRINT ); }
 "for"      { return token( FOR ); }
 "while"    { return token( WHILE ); }
 "function" { return token( FUNCTION ); }
