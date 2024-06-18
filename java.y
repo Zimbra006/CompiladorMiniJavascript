@@ -13,7 +13,7 @@ struct Atributos {
 
   int linha = 0, coluna = 0;
 
-  // Só para argumentos e parâmetros
+  // Para argumentos, parâmetros e elementos de array
   int contador = 0;     
   
   // Só para valor default de argumento        
@@ -474,6 +474,14 @@ E : LVALUE '=' E
     {
       $$.c = $3.c + to_string( $3.contador ) + $1.c + "$";
     }
+  | '{' LISTA_CAMPOS '}'
+      {
+        $$.c = "{}" + $2.c;
+      }
+  | '[' LISTA_ELEMS ']'
+      {
+        $$.c = "[]" + $2.c;
+      }
   ;
 
 LISTA_ARGs : ARGs
@@ -488,13 +496,37 @@ ARGs : ARGs ',' E
          $$.contador = 1; }
      ;
 
+LISTA_CAMPOS : LISTA_CAMPOS ',' CAMPO
+              {
+                $$.c = $1.c + $3.c;
+              }
+             | CAMPO
+             ;
+
+CAMPO : ID ':' E 
+      { 
+        $$.c = $1.c + $3.c + "[<=]";
+      }
+
+LISTA_ELEMS : LISTA_ELEMS ',' E
+              {
+                $$.c = $1.c + to_string($1.contador) + $3.c + "[<=]";
+                $$.contador = $1.contador + 1;
+              }
+             | E
+              {
+                $$.c = "0" + $1.c + "[<=]";
+                $$.contador = 1;
+              }
+             ;
+
 %%
 
 #include "lex.yy.c"
 
 void yyerror( const char* st ) {
    cerr << st << endl; 
-   cerr << "Proximo a: " << yytext << ", linha: " << yylval.linha << endl;
+   cerr << "Proximo a: " << yytext << endl <<"Linha: " << yylval.linha << endl;
    exit( 1 );
 }
 
