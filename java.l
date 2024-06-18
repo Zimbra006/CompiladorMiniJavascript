@@ -50,6 +50,11 @@ ASM       "asm{"
 "while"    { return token( WHILE ); }
 "function" { return token( FUNCTION ); }
 "return"   { return token( RETURN ); }
+"true"     { return token( TRUE_TK );}
+"false"     { return token( FALSE_TK );}
+
+";"+       { return token( ';' ); }
+
 {ASM}      { BEGIN asm; return token( ASM ); }
 
 {ID}       { return token( ID ); }

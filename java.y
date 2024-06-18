@@ -147,14 +147,14 @@ void print( vector<string> codigo ) {
 %}
 
 %token ID PRINT FOR WHILE ASM ASM_WORD
-%token LET VAR CONST FUNCTION RETURN
+%token LET VAR CONST FUNCTION RETURN TRUE_TK FALSE_TK
 %token CDOUBLE CSTRING CINT
 
 %right '=' MAIS_IGUAL
 %nonassoc '<' '>' MAIS_MAIS
 %nonassoc  AND OR ME_IG MA_IG DIF IGUAL
   /* Esses três são adicionados para resolver o conflito */
-  /* shift-reduce no yacc */
+  /* shift-reduce de if no yacc */
 %nonassoc IF
 %nonassoc REDUCE
 %nonassoc ELSE
@@ -179,8 +179,11 @@ CMD : CMD_LET ';' OPT_SC
     | CMD_CONST ';' OPT_SC
     | CMD_IF OPT_SC
     | CMD_FUNC OPT_SC
-    | CMD_RET OPT_SC
-    | E CMD_ASM ';' OPT_SC 
+    | CMD_RET ';' OPT_SC
+    { $$.c = "undefined" + ("@" + $1.c); }
+    | CMD_RET E ';' OPT_SC
+    { $$.c = $2.c + $1.c; }
+    | E CMD_ASM ';' OPT_SC
       { $$.c = $1.c + $2.c; }
     | PRINT E ';' OPT_SC
       { $$.c = $2.c + "println" + "#"; }
@@ -192,10 +195,8 @@ CMD : CMD_LET ';' OPT_SC
       { ts.pop_back(); $$.c = "<{" + $3.c + "}>"; }
     ;
 
-// Símbolo para ponto e vírgula opcionais
-OPT_SC : OPT_SC ';'
-       | {$$.clear(); }
-       ;
+OPT_SC : ';'
+       | { $$.clear();}
 
 // Símbolo apenas para empilhar tabelas de símbolos
 EMPILHA_TS : { ts.push_back( map< string, Simbolo >{} ); } 
@@ -222,8 +223,7 @@ CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); }
            }
          ;
 
-CMD_RET : RETURN E { $$.c = $2.c + "'&retorno'" + "@"+ "~"; }
-        | RETURN { $$.c = vector<string>{"undefined", "@", "'&retorno'", "@", "~"}; }
+CMD_RET : RETURN { $$.c = vector<string>{"'&retorno'", "@", "~"}; }
         ;
 
 LISTA_PARAMs : PARAMs
@@ -236,7 +236,19 @@ PARAMs : PARAMs ',' PARAM
                 + "[@]" + "=" + "^"; 
                 
          if( $3.valor_default.size() > 0 ) {
-           // Gerar código para testar valor default.
+            // Teste para usar valor default
+            string lbl_true = gera_label( "lbl_true" );
+            string lbl_fim_if = gera_label( "lbl_fim_if" );
+            string definicao_lbl_true = ":" + lbl_true;
+            string definicao_lbl_fim_if = ":" + lbl_fim_if;
+                    
+            $$.c = $$.c + $3.c + "@" + "undefined" + "@" + "==" +
+                   lbl_true + "?" +             
+                   lbl_fim_if + "#" +           
+                   definicao_lbl_true +
+                   $3.c + $3.valor_default + "=" + "^" +  
+                   definicao_lbl_fim_if         
+                   ;
          }
          $$.contador = $1.contador + $3.contador; 
        }
@@ -245,7 +257,19 @@ PARAMs : PARAMs ',' PARAM
          $$.c = $1.c + "&" + $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^"; 
                 
          if( $1.valor_default.size() > 0 ) {
-           // Gerar código para testar valor default.
+            // Teste para usar valor default
+            string lbl_true = gera_label( "lbl_true" );
+            string lbl_fim_if = gera_label( "lbl_fim_if" );
+            string definicao_lbl_true = ":" + lbl_true;
+            string definicao_lbl_fim_if = ":" + lbl_fim_if;
+                    
+            $$.c = $$.c + $1.c + "@" + "undefined" + "@" + "==" +
+                   lbl_true + "?" +             
+                   lbl_fim_if + "#" +           
+                   definicao_lbl_true +
+                   $1.c + $1.valor_default + "=" + "^" +  
+                   definicao_lbl_fim_if        
+                   ;
          }
          $$.contador = $1.contador; 
        }
@@ -358,132 +382,99 @@ VAR_LET : ID
       { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna );}
     | ID '=' E
       { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
-    | ID '=' '{' '}'
-      { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + "{}" + "=" + "^";}
     ;
 
 VAR_VAR : ID  
       { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ); }
     | ID '=' E
       { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
-    | ID '=' '{' '}'
-      { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ) + $1.c + "{}" + "=" + "^";}
     ;
 
 VAR_CONST : ID '=' E
       { $$.c = declara_var( DeclConst, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^"; }
-          | ID '=' '{' '}'
-      { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + "{}" + "=" + "^";}
-    ;
+      ;
 
-LVALUE : ID 
+LVALUE : ID
        ;
        
 LVALUEPROP : E '[' E ']' { $$.c = $1.c + $3.c; }
            | E '.' ID { $$.c = $1.c + $3.c; }
            ;
 
-E : ATRIB
-  | BOOL
-  | MATH
-  | VALUES
+E : LVALUE '=' E 
+    { 
+      checa_simbolo( $1.c[0], true );  
+      $$.c = $1.c + $3.c + "="; 
+    }
+  | LVALUE MAIS_IGUAL E
+    {
+      checa_simbolo( $1.c[0], true );  
+      $$.c = $1.c + $1.c + "@" + $3.c + "+" + "="; 
+    }
+  | LVALUE MAIS_MAIS
+    {
+      checa_simbolo( $1.c[0], true );  
+      $$.c = $1.c + "@" + $1.c + $1.c + "@" + "1" + "+" + "=" + "^"; 
+    }
+  | LVALUEPROP '=' E 
+    { $$.c = $1.c + $3.c + "[=]"; }
+  | LVALUEPROP MAIS_IGUAL E 
+    { $$.c = $1.c + $1.c + "[@]" + $3.c + "+" + "[=]"; }
+  | LVALUEPROP MAIS_MAIS 
+    { $$.c = $1.c + "[@]" + $1.c + $1.c + "[@]" + "1" + "+" + "=" + "^"; }
+  | E '<' E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E '>' E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E AND E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E OR E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E ME_IG E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E MA_IG E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E DIF E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E IGUAL E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E '+' E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E '-' E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E '*' E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E '/' E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | E '%' E
+    { $$.c = $1.c + $3.c + $2.c; }
+  | CDOUBLE
+  | '+' CDOUBLE
+    { $$.c = $2.c; }
+  | '-' CDOUBLE
+    { $$.c = "0" + $2.c + "-"; }
+  | CINT
+  | '+' CINT
+    { $$.c = $2.c; }
+  | '-' CINT
+    { $$.c = "0" + $2.c + "-"; }
+  | CSTRING
+  | '{' '}'
+    { $$.c = vector<string>{"{}"}; }
+  | '[' ']'
+    { $$.c = vector<string>{"[]"}; }
+  | LVALUE 
+    { $$.c = $1.c + "@"; } 
+  | LVALUEPROP
+    { $$.c = $1.c + "[@]"; }
+  | TRUE_TK
+  | FALSE_TK
   | '(' E ')' { $$.c = $2.c; }
   | E '(' LISTA_ARGs ')'
     {
       $$.c = $3.c + to_string( $3.contador ) + $1.c + "$";
     }
   ;
-
-  /* Lida apenas com atribuições */
-ATRIB : LVALUE '=' '{' '}'
-        { 
-          checa_simbolo( $1.c[0], true ); 
-          $$.c = $1.c + "{}" + "="; 
-        }
-      | LVALUE '=' '[' ']'
-        { 
-          checa_simbolo( $1.c[0], true ); 
-          $$.c = $1.c + "[]" + "="; 
-        }
-      |  LVALUE '=' E 
-        { 
-          checa_simbolo( $1.c[0], true );  
-          $$.c = $1.c + $3.c + "="; 
-        }
-      | LVALUE MAIS_IGUAL E
-        {
-          checa_simbolo( $1.c[0], true );  
-          $$.c = $1.c + $1.c + "@" + $3.c + "+" + "="; 
-        }
-      | LVALUE MAIS_MAIS
-        {
-          checa_simbolo( $1.c[0], true );  
-          $$.c = $1.c + "@" + $1.c + $1.c + "@" + "1" + "+" + "=" + "^"; 
-        }
-      | LVALUEPROP '=' '{' '}'
-        { $$.c = $1.c + "{}" + "[=]"; }
-      | LVALUEPROP '=' '[' ']'
-        { $$.c = $1.c + "[]" + "[=]"; }
-      | LVALUEPROP '=' E 
-        { $$.c = $1.c + $3.c + "[=]"; }
-      | LVALUEPROP MAIS_IGUAL E 
-        { $$.c = $1.c + $1.c + "[@]" + $3.c + "+" + "[=]"; }
-      | LVALUEPROP MAIS_MAIS 
-        { $$.c = $1.c + "[@]" + $1.c + $1.c + "[@]" + "1" + "+" + "=" + "^"; }
-      ;
-
-  /* Lida apenas com expressões booleanas */
-BOOL: E '<' E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E '>' E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E AND E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E OR E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E ME_IG E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E MA_IG E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E DIF E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E IGUAL E
-      { $$.c = $1.c + $3.c + $2.c; }
-    ;
-
-  /* Lida apenas com expressões matemáticas */
-MATH: E '+' E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E '-' E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E '*' E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E '/' E
-      { $$.c = $1.c + $3.c + $2.c; }
-    | E '%' E
-      { $$.c = $1.c + $3.c + $2.c; }
-    ;
-  /* Lida apenas com valores (constantes ou variáveis) */
-VALUES: CDOUBLE
-      | '+' CDOUBLE
-        { $$.c = $2.c; }
-      | '-' CDOUBLE
-        { $$.c = "0" + $2.c + "-"; }
-      | CINT
-      | '+' CINT
-        { $$.c = $2.c; }
-      | '-' CINT
-        { $$.c = "0" + $2.c + "-"; }
-      | CSTRING
-      | '(' '{' '}' ')'
-        { $$.c = vector<string>{"{}"}; }
-      | '[' ']'
-        { $$.c = vector<string>{"[]"}; }
-      | LVALUE 
-        { $$.c = $1.c + "@"; } 
-      | LVALUEPROP
-        { $$.c = $1.c + "[@]"; }
-      ;
 
 LISTA_ARGs : ARGs
            | { $$.clear(); }

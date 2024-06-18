@@ -1,5 +1,10 @@
-function log( msg ) {
-  msg asm{println # undefined};
+function f( x ) {
+  let b = f;
+  const h = [ ];
+  f = x;
+  return b ;
 }
 
-let r = log( 'Hello, world!' );
+let a;
+let g = f( a = [ ], { 
+} );
