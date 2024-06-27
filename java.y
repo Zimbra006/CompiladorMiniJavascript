@@ -110,13 +110,19 @@ vector<string> declara_var( TipoDecl tipo, string nome, int linha, int coluna ) 
   } 
   else {
     cerr << "Redeclaração de '" << nomeTipoDecl[topo[nome].tipo] << " " << nome 
-         << "' na linha: " << topo[nome].linha 
+         << "' declarado na linha: " << topo[nome].linha 
          << ", coluna: " << topo[nome].coluna << endl;
     exit( 1 );     
   }
 }
+
+// Checagem de variáveis deve ser desabilitada dentro de funções
+bool dentroFuncao = false;
+
 // Substitui ambas as funções checarVariavel
 void checa_simbolo( string nome, bool modificavel ) {
+
+  if (dentroFuncao) return;
 
   for( int i = ts.size() - 1; i >= 0; i-- ) {  
     auto& atual = ts[i];
@@ -148,9 +154,9 @@ void print( vector<string> codigo ) {
 
 %token ID PRINT FOR WHILE ASM ASM_WORD
 %token LET VAR CONST FUNCTION RETURN TRUE_TK FALSE_TK
-%token CDOUBLE CSTRING CINT
+%token CDOUBLE CSTRING CINT PARENTESES_FUNCAO
 
-%right '=' MAIS_IGUAL
+%right '=' MAIS_IGUAL SETA
 %nonassoc '<' '>' MAIS_MAIS
 %nonassoc  AND OR ME_IG MA_IG DIF IGUAL
   /* Esses três são adicionados para resolver o conflito */
@@ -174,29 +180,26 @@ CMDs : CMDs CMD  { $$.c =  $1.c + $2.c ; };
      | CMD
      ;
      
-CMD : CMD_LET OPT_SC
-    | CMD_VAR OPT_SC
-    | CMD_CONST OPT_SC
-    | CMD_IF OPT_SC
-    | CMD_FUNC OPT_SC
-    | CMD_RET ';' OPT_SC
+CMD : CMD_LET ';'
+    | CMD_VAR ';'
+    | CMD_CONST ';'
+    | CMD_IF
+    | CMD_FUNC
+    | CMD_RET ';'
     { $$.c = "undefined" + ("@" + $1.c); }
-    | CMD_RET E ';' OPT_SC
+    | CMD_RET E ';'
     { $$.c = $2.c + $1.c; }
-    | E CMD_ASM ';' OPT_SC
+    | E CMD_ASM ';'
       { $$.c = $1.c + $2.c; }
-    | PRINT E ';' OPT_SC
+    | PRINT E ';'
       { $$.c = $2.c + "println" + "#"; }
-    | CMD_WHILE OPT_SC
-    | CMD_FOR OPT_SC
-    | E OPT_SC
+    | CMD_WHILE
+    | CMD_FOR
+    | E ';'
       { $$.c = $1.c + "^"; }
-    | '{' EMPILHA_TS CMDs '}' OPT_SC
+    | '{' EMPILHA_TS CMDs '}'
       { ts.pop_back(); $$.c = "<{" + $3.c + "}>"; }
     ;
-
-OPT_SC : ';'
-       | { $$.clear();}
 
 // Símbolo apenas para empilhar tabelas de símbolos
 EMPILHA_TS : { ts.push_back( map< string, Simbolo >{} ); } 
@@ -209,21 +212,29 @@ ASM_STRING : ASM_WORD ASM_STRING { $$.c = $1.c + $2.c;}
            | { $$.clear(); }
            ;
 
-CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); } 
-             '(' EMPILHA_TS LISTA_PARAMs ')' '{' CMDs '}'
+CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); dentroFuncao = true;} 
+             '(' LISTA_PARAMs ')' '{' CMDs '}'
            { 
              string lbl_endereco_funcao = gera_label( "func_" + $2.c[0] );
              string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
              
              $$.c = $2.c + "&" + $2.c + "{}"  + "=" + "'&funcao'" +
                     lbl_endereco_funcao + "[=]" + "^";
-             funcoes = funcoes + definicao_lbl_endereco_funcao + $6.c + $9.c +
+             funcoes = funcoes + definicao_lbl_endereco_funcao + $5.c + $8.c +
                        "undefined" + "@" + "'&retorno'" + "@"+ "~";
              ts.pop_back(); 
+             dentroFuncao = false;
            }
          ;
 
-CMD_RET : RETURN { $$.c = vector<string>{"'&retorno'", "@", "~"}; }
+CMD_RET : RETURN 
+        { 
+          if (!dentroFuncao) {
+            cerr << "Erro: Não é permitido 'return' fora de funções." << endl;
+            exit( 1 );     
+          }
+          $$.c = vector<string>{"'&retorno'", "@", "~"}; 
+        }  
         ;
 
 LISTA_PARAMs : PARAMs
@@ -231,10 +242,10 @@ LISTA_PARAMs : PARAMs
            ;
            
 PARAMs : PARAMs ',' PARAM  
-       {  
+       { 
+         declara_var( DeclLet, $3.c[0], $1.linha, $1.coluna );
          $$.c = $1.c + $3.c + "&" + $3.c + "arguments" + "@" + to_string( $1.contador )
                 + "[@]" + "=" + "^"; 
-                
          if( $3.valor_default.size() > 0 ) {
             // Teste para usar valor default
             string lbl_true = gera_label( "lbl_true" );
@@ -252,10 +263,10 @@ PARAMs : PARAMs ',' PARAM
          }
          $$.contador = $1.contador + $3.contador; 
        }
-     | PARAM 
+     | PARAM EMPILHA_TS
        {  
+         declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna );
          $$.c = $1.c + "&" + $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^"; 
-                
          if( $1.valor_default.size() > 0 ) {
             // Teste para usar valor default
             string lbl_true = gera_label( "lbl_true" );
@@ -279,14 +290,18 @@ PARAM : ID
       { $$.c = $1.c;      
         $$.contador = 1;
         $$.valor_default.clear();
-        declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ); 
       }
     | ID '=' E
-      { // Código do IF
+      {
         $$.c = $1.c;
         $$.contador = 1;
-        $$.valor_default = $3.c;         
-        declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ); 
+        $$.valor_default = $3.c;          
+      }
+    | ID '=' OBJ
+      {
+        $$.c = $1.c;
+        $$.contador = 1;
+        $$.valor_default = $3.c;          
       }
     ;
 
@@ -382,36 +397,39 @@ VAR_LET : ID
       { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna );}
     | ID '=' E
       { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
+    | ID '=' OBJ
+      { $$.c = declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
     ;
 
 VAR_VAR : ID  
       { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ); }
     | ID '=' E
       { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
+    | ID '=' OBJ
+      { $$.c = declara_var( DeclVar, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
     ;
 
 VAR_CONST : ID '=' E
       { $$.c = declara_var( DeclConst, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^"; }
-      ;
-
-LVALUE : ID
-       ;
+      | ID '=' OBJ
+      { $$.c = declara_var( DeclConst, $1.c[0], $1.linha, $1.coluna ) + $1.c + $3.c + "=" + "^";}
+    ;
        
 LVALUEPROP : E '[' E ']' { $$.c = $1.c + $3.c; }
            | E '.' ID { $$.c = $1.c + $3.c; }
            ;
 
-E : LVALUE '=' E 
+E : ID '=' E 
     { 
       checa_simbolo( $1.c[0], true );  
       $$.c = $1.c + $3.c + "="; 
     }
-  | LVALUE MAIS_IGUAL E
+  | ID MAIS_IGUAL E
     {
       checa_simbolo( $1.c[0], true );  
       $$.c = $1.c + $1.c + "@" + $3.c + "+" + "="; 
     }
-  | LVALUE MAIS_MAIS
+  | ID MAIS_MAIS
     {
       checa_simbolo( $1.c[0], true );  
       $$.c = $1.c + "@" + $1.c + $1.c + "@" + "1" + "+" + "=" + "^"; 
@@ -463,7 +481,7 @@ E : LVALUE '=' E
     { $$.c = vector<string>{"{}"}; }
   | '[' ']'
     { $$.c = vector<string>{"[]"}; }
-  | LVALUE 
+  | ID 
     { $$.c = $1.c + "@"; } 
   | LVALUEPROP
     { $$.c = $1.c + "[@]"; }
@@ -474,37 +492,103 @@ E : LVALUE '=' E
     {
       $$.c = $3.c + to_string( $3.contador ) + $1.c + "$";
     }
-  | '{' LISTA_CAMPOS '}'
-      {
-        $$.c = "{}" + $2.c;
-      }
+  | '(' OBJ ')' 
+    { 
+      $$.c = $2.c;
+    }
   | '[' LISTA_ELEMS ']'
-      {
-        $$.c = "[]" + $2.c;
-      }
-  | FUNCTION '(' EMPILHA_TS LISTA_PARAMs ')' '{' CMDs '}'
+    {
+      $$.c = "[]" + $2.c;
+    }
+  | FUNCTION '(' LISTA_PARAMs ')' '{' CMDs '}'
            { 
-             string lbl_endereco_funcao = gera_label( "func_" + $2.c[0] );
+             string lbl_endereco_funcao = gera_label( "func_anon" );
              string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
              
              $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
-             funcoes = funcoes + definicao_lbl_endereco_funcao + $4.c + $7.c +
+             funcoes = funcoes + definicao_lbl_endereco_funcao + $3.c + $6.c +
                        "undefined" + "@" + "'&retorno'" + "@"+ "~";
              ts.pop_back(); 
            }
+  | ID SETA EMPILHA_TS E
+      {
+        string lbl_endereco_funcao = gera_label( "func_anon" );
+        string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
+             
+        $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
+        funcoes = funcoes + definicao_lbl_endereco_funcao + declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) +
+        $4.c + "'&retorno'" + "@"+ "~";
+        ts.pop_back(); 
+      }
+  | ID SETA EMPILHA_TS '{' CMDs '}'
+      {
+        string lbl_endereco_funcao = gera_label( "func_anon" );
+        string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
+             
+        $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
+        funcoes = funcoes + definicao_lbl_endereco_funcao + declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) +
+        $5.c + "undefined" + "@" + "'&retorno'" + "@"+ "~";
+        ts.pop_back(); 
+      }
+  | '(' PARENTESES_FUNCAO SETA EMPILHA_TS E
+      {
+        string lbl_endereco_funcao = gera_label( "func_anon" );
+        string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
+             
+        $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
+        funcoes = funcoes + definicao_lbl_endereco_funcao + $4.c + "'&retorno'" + "@"+ "~";
+        ts.pop_back();
+      }
+  | '(' PARENTESES_FUNCAO SETA '{' EMPILHA_TS CMDs '}'
+      {
+        string lbl_endereco_funcao = gera_label( "func_anon" );
+        string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
+             
+        $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
+        funcoes = funcoes + definicao_lbl_endereco_funcao + $6.c + "undefined" + "@" + "'&retorno'" + "@"+ "~";
+        ts.pop_back();
+      }
+  | '(' LISTA_PARAMs PARENTESES_FUNCAO SETA E
+      {
+        string lbl_endereco_funcao = gera_label( "func_anon" );
+        string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
+             
+        $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
+        funcoes = funcoes + definicao_lbl_endereco_funcao + $2.c + $5.c + "'&retorno'" + "@"+ "~";
+        ts.pop_back();
+      }
+  | '(' LISTA_PARAMs PARENTESES_FUNCAO SETA '{' CMDs '}'
+      {
+        string lbl_endereco_funcao = gera_label( "func_anon" );
+        string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
+             
+        $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
+        funcoes = funcoes + definicao_lbl_endereco_funcao + $2.c + $6.c + "undefined" + "@" + "'&retorno'" + "@"+ "~";
+        ts.pop_back();
+      }
   ;
 
 LISTA_ARGs : ARGs
            | { $$.clear(); }
            ;
              
-ARGs : ARGs ',' E
+ARGs : ARGs ',' ARG
        { $$.c = $1.c + $3.c;
          $$.contador = $1.contador + 1; }
-     | E
+     | ARG
        { $$.c = $1.c;
          $$.contador = 1; }
      ;
+
+ARG : E
+    | OBJ
+    ;
+
+OBJ : '{' LISTA_CAMPOS '}'
+      {
+        $$.c = "{}" + $2.c;
+      } 
+    ;
 
 LISTA_CAMPOS : LISTA_CAMPOS ',' CAMPO
               {
@@ -517,18 +601,27 @@ CAMPO : ID ':' E
       { 
         $$.c = $1.c + $3.c + "[<=]";
       }
+      | ID ':' OBJ
+      { 
+        $$.c = $1.c + $3.c + "[<=]";
+      }
+      ;
 
-LISTA_ELEMS : LISTA_ELEMS ',' E
+LISTA_ELEMS : LISTA_ELEMS ',' ELEM
               {
                 $$.c = $1.c + to_string($1.contador) + $3.c + "[<=]";
                 $$.contador = $1.contador + 1;
               }
-             | E
+             | ELEM
               {
                 $$.c = "0" + $1.c + "[<=]";
                 $$.contador = 1;
               }
              ;
+
+ELEM : E
+     | OBJ
+     ;
 
 %%
 
@@ -536,7 +629,9 @@ LISTA_ELEMS : LISTA_ELEMS ',' E
 
 void yyerror( const char* st ) {
    cerr << st << endl; 
-   cerr << "Proximo a: " << yytext << endl <<"Linha: " << yylval.linha << endl;
+   cerr << "Proximo a: " << yytext << endl 
+        << "Linha: " << yylval.linha << endl
+        << "Coluna: " <<yylval.coluna << endl;
    exit( 1 );
 }
 

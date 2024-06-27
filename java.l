@@ -17,6 +17,7 @@ STRING_S  '([^'\n]|{D_ASPAS_S}|{B_ASPAS_S})*'
 STRING_D  \"([^"\n]|{D_ASPAS_D}|{B_ASPAS_D})*\"
 ID        {L}({L}|{D})*
 ASM       "asm{"
+SETA      "=>"
 
 %x asm
 
@@ -41,6 +42,9 @@ ASM       "asm{"
 "+="       { return token( MAIS_IGUAL ); }
 "++"       { return token( MAIS_MAIS ); }
 
+{SETA}             { return token( SETA ); }
+")"/[ \t\n]*{SETA} { return token( PARENTESES_FUNCAO ); }
+
 "let"      { return token( LET ); }
 "var"      { return token( VAR ); }
 "const"    { return token( CONST ); }
@@ -52,8 +56,6 @@ ASM       "asm{"
 "return"   { return token( RETURN ); }
 "true"     { return token( TRUE_TK );}
 "false"     { return token( FALSE_TK );}
-
-";"+       { return token( ';' ); }
 
 {ASM}      { BEGIN asm; return token( ASM ); }
 
