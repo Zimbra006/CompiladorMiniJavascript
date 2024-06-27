@@ -42,7 +42,7 @@ SETA      "=>"
 "+="       { return token( MAIS_IGUAL ); }
 "++"       { return token( MAIS_MAIS ); }
 
-{SETA}             { return token( SETA ); }
+{SETA}             { dentroFuncao = true; return token( SETA ); }
 ")"/[ \t\n]*{SETA} { return token( PARENTESES_FUNCAO ); }
 
 "let"      { return token( LET ); }
@@ -52,7 +52,7 @@ SETA      "=>"
 "else"     { return token( ELSE ); }
 "for"      { return token( FOR ); }
 "while"    { return token( WHILE ); }
-"function" { return token( FUNCTION ); }
+"function" { dentroFuncao = true; return token( FUNCTION ); }
 "return"   { return token( RETURN ); }
 "true"     { return token( TRUE_TK );}
 "false"     { return token( FALSE_TK );}

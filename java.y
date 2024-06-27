@@ -202,10 +202,6 @@ CMD : CMD_LET ';'
 EMPILHA_TS : { ts.push_back( map< string, Simbolo >{} ); } 
            ;
 
-// Faz a mesma coisa que o de cima, mas também sinaliza que está dentro de uma função
-EMPILHA_TS_FUNC : { ts.push_back( map< string, Simbolo >{} ); dentroFuncao = true;} 
-           ;
-
 CMD_ASM : ASM ASM_STRING '}' { $$.c = $2.c + "^"; }
         ;
 
@@ -213,9 +209,10 @@ ASM_STRING : ASM_WORD ASM_STRING { $$.c = $1.c + $2.c;}
            | { $$.clear(); }
            ;
 
-CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna );} 
-             '(' LISTA_PARAMs ')' '{' CMDs '}'
+CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); } 
+             '(' LISTA_PARAMs ')' '{' CMDs'}'
            { 
+            printf(dentroFuncao ? "true" : "false"); 
              string lbl_endereco_funcao = gera_label( "func_" + $2.c[0] );
              string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
              
@@ -264,7 +261,7 @@ PARAMs : PARAMs ',' PARAM
          }
          $$.contador = $1.contador + $3.contador; 
        }
-     | PARAM EMPILHA_TS_FUNC
+     | PARAM EMPILHA_TS
        {  
          declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna );
          $$.c = $1.c + "&" + $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^"; 
@@ -531,7 +528,7 @@ E : ID '=' E
              ts.pop_back(); 
              dentroFuncao = false;
            }
-  | ID SETA EMPILHA_TS_FUNC E
+  | ID SETA EMPILHA_TS E
       {
         string lbl_endereco_funcao = gera_label( "func_anon" );
         string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
@@ -542,7 +539,7 @@ E : ID '=' E
         ts.pop_back();
         dentroFuncao = false;
       }
-  | ID SETA EMPILHA_TS_FUNC '{' CMDs '}'
+  | ID SETA EMPILHA_TS '{' CMDs '}'
       {
         string lbl_endereco_funcao = gera_label( "func_anon" );
         string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
@@ -553,7 +550,7 @@ E : ID '=' E
         ts.pop_back();
         dentroFuncao = false;
       }
-  | '(' PARENTESES_FUNCAO SETA EMPILHA_TS_FUNC E
+  | '(' PARENTESES_FUNCAO SETA EMPILHA_TS E
       {
         string lbl_endereco_funcao = gera_label( "func_anon" );
         string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
@@ -563,7 +560,7 @@ E : ID '=' E
         ts.pop_back();
         dentroFuncao = false;
       }
-  | '(' PARENTESES_FUNCAO SETA '{' EMPILHA_TS_FUNC CMDs '}'
+  | '(' PARENTESES_FUNCAO SETA '{' EMPILHA_TS CMDs '}'
       {
         string lbl_endereco_funcao = gera_label( "func_anon" );
         string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;

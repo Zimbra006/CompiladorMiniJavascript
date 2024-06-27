@@ -1,4 +1,14 @@
-let a, f = x => { a = x; return y => a*(y + 1.01); };
-let b = f(9);
-let c = b(7);
-let d = f( 8.1 )( 7.1 );
+function criaObj() {
+  let obj = { a : [ {}, { teste: 1 }, c=24*8+1 ], b: 'nome', log: x => print(x) };
+  return obj;
+}
+
+let obj = [];
+let c;
+{ obj = criaObj();
+let c = [];
+
+log( obj );
+log( obj.a );
+log( obj.a[obj.a[1].teste+1] );
+}

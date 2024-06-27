@@ -758,7 +758,7 @@ YY_RULE_SETUP
 case 16:
 YY_RULE_SETUP
 #line 45 "java.l"
-{ return token( SETA ); }
+{ dentroFuncao = true; return token( SETA ); }
 	YY_BREAK
 case 17:
 *yy_cp = yy_hold_char; /* undo effects of setting up yytext */
@@ -806,7 +806,7 @@ YY_RULE_SETUP
 case 25:
 YY_RULE_SETUP
 #line 55 "java.l"
-{ return token( FUNCTION ); }
+{ dentroFuncao = true; return token( FUNCTION ); }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
