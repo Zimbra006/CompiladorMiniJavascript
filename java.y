@@ -142,8 +142,9 @@ void checa_simbolo( string nome, bool modificavel ) {
 }
 
 void print( vector<string> codigo ) {
+  int contador = 0;
   for( string s : codigo )
-    cout << s << " ";
+    cout << contador++ << ": " << s << "\n";
     
   cout << endl;  
 }
@@ -435,6 +436,11 @@ E : ID '=' E
       checa_simbolo( $1.c[0], true );  
       $$.c = $1.c + $3.c + "="; 
     }
+  | ID '=' OBJ
+    { 
+      checa_simbolo( $1.c[0], true );  
+      $$.c = $1.c + $3.c + "="; 
+    }
   | ID MAIS_IGUAL E
     {
       checa_simbolo( $1.c[0], true );  
@@ -511,15 +517,16 @@ E : ID '=' E
     {
       $$.c = "[]" + $2.c;
     }
-  | FUNCTION '(' LISTA_PARAMs ')' '{' CMDs '}'
+  | FUNCTION {dentroFuncao = true;} '(' LISTA_PARAMs ')' '{' CMDs '}'
            { 
              string lbl_endereco_funcao = gera_label( "func_anon" );
              string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
              
              $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
-             funcoes = funcoes + definicao_lbl_endereco_funcao + $3.c + $6.c +
+             funcoes = funcoes + definicao_lbl_endereco_funcao + $4.c + $7.c +
                        "undefined" + "@" + "'&retorno'" + "@"+ "~";
              ts.pop_back(); 
+             dentroFuncao = false;
            }
   | ID SETA EMPILHA_TS E
       {
@@ -528,7 +535,7 @@ E : ID '=' E
              
         $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
         funcoes = funcoes + definicao_lbl_endereco_funcao + declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) +
-        $4.c + "'&retorno'" + "@"+ "~";
+        $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^" + $4.c + "'&retorno'" + "@"+ "~";
         ts.pop_back(); 
       }
   | ID SETA EMPILHA_TS '{' CMDs '}'
@@ -538,7 +545,7 @@ E : ID '=' E
              
         $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
         funcoes = funcoes + definicao_lbl_endereco_funcao + declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) +
-        $5.c + "undefined" + "@" + "'&retorno'" + "@"+ "~";
+        $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^" + $5.c + "undefined" + "@" + "'&retorno'" + "@"+ "~";
         ts.pop_back(); 
       }
   | '(' PARENTESES_FUNCAO SETA EMPILHA_TS E

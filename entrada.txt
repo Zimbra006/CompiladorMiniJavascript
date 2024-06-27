@@ -1,2 +1,11 @@
-let i;
-for( i = 0; i < 10; i++ ) {}
+function log( msg ) {
+  msg asm{println # undefined};
+}
+
+log(9);
+
+let print = m => log( 'Saida: ' + m );
+
+let a = 9;
+
+print(a);
