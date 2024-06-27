@@ -142,11 +142,8 @@ void checa_simbolo( string nome, bool modificavel ) {
 }
 
 void print( vector<string> codigo ) {
-  int inc = 0;
-  for( int i = 0; i < codigo.size(); i++ ) {
-    if (codigo[i] == "") { inc--; continue; } 
-    cout << i + inc << ": " << codigo[i] << endl;
-  }
+  for( string s : codigo )
+    cout << s << " ";
     
   cout << endl;  
 }
@@ -321,7 +318,21 @@ CMD_WHILE : WHILE '(' E ')' CMD
           }
           ;
  
-CMD_FOR : FOR '(' PRIM_E ';' E ';' E ')' CMD 
+CMD_FOR : FOR '(' PRIM_E ';' E ';' E ')' E
+        { string lbl_fim_for = gera_label( "fim_for" );
+          string lbl_condicao_for = gera_label( "condicao_for" );
+          string lbl_comando_for = gera_label( "comando_for" );
+          string definicao_lbl_fim_for = ":" + lbl_fim_for;
+          string definicao_lbl_condicao_for = ":" + lbl_condicao_for;
+          string definicao_lbl_comando_for = ":" + lbl_comando_for;
+          
+          $$.c = $3.c + definicao_lbl_condicao_for +
+                 $5.c + lbl_comando_for + "?" + lbl_fim_for + "#" +
+                 definicao_lbl_comando_for + $9.c + "^" + 
+                 $7.c + "^" + lbl_condicao_for + "#" +
+                 definicao_lbl_fim_for;
+        }
+        | FOR '(' PRIM_E ';' E ';' E ')' CMD 
         { string lbl_fim_for = gera_label( "fim_for" );
           string lbl_condicao_for = gera_label( "condicao_for" );
           string lbl_comando_for = gera_label( "comando_for" );
