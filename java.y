@@ -581,6 +581,7 @@ E : ID '=' E
         $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
         funcoes = funcoes + definicao_lbl_endereco_funcao + $2.c + $5.c + "'&retorno'" + "@"+ "~";
         ts.pop_back();
+        dentroFuncao = false;
       }
   | '(' LISTA_PARAMs PARENTESES_FUNCAO SETA '{' CMDs '}'
       {
