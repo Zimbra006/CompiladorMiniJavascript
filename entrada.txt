@@ -1,11 +1,4 @@
-function log( msg ) {
-  msg asm{println # undefined};
-}
-
-log(9);
-
-let print = m => log( 'Saida: ' + m );
-
-let a = 9;
-
-print(a);
+let a, f = x => { a = x; return y => a*(y + 1.01); };
+let b = f(9);
+let c = b(7);
+let d = f( 8.1 )( 7.1 );

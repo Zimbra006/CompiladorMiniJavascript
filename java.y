@@ -142,9 +142,8 @@ void checa_simbolo( string nome, bool modificavel ) {
 }
 
 void print( vector<string> codigo ) {
-  int contador = 0;
   for( string s : codigo )
-    cout << contador++ << ": " << s << "\n";
+    cout << s << " ";
     
   cout << endl;  
 }
@@ -203,6 +202,10 @@ CMD : CMD_LET ';'
 EMPILHA_TS : { ts.push_back( map< string, Simbolo >{} ); } 
            ;
 
+// Faz a mesma coisa que o de cima, mas também sinaliza que está dentro de uma função
+EMPILHA_TS_FUNC : { ts.push_back( map< string, Simbolo >{} ); dentroFuncao = true;} 
+           ;
+
 CMD_ASM : ASM ASM_STRING '}' { $$.c = $2.c + "^"; }
         ;
 
@@ -210,7 +213,7 @@ ASM_STRING : ASM_WORD ASM_STRING { $$.c = $1.c + $2.c;}
            | { $$.clear(); }
            ;
 
-CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna ); dentroFuncao = true;} 
+CMD_FUNC : FUNCTION ID { declara_var( DeclVar, $2.c[0], $2.linha, $2.coluna );} 
              '(' LISTA_PARAMs ')' '{' CMDs '}'
            { 
              string lbl_endereco_funcao = gera_label( "func_" + $2.c[0] );
@@ -261,7 +264,7 @@ PARAMs : PARAMs ',' PARAM
          }
          $$.contador = $1.contador + $3.contador; 
        }
-     | PARAM EMPILHA_TS
+     | PARAM EMPILHA_TS_FUNC
        {  
          declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna );
          $$.c = $1.c + "&" + $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^"; 
@@ -517,18 +520,18 @@ E : ID '=' E
     {
       $$.c = "[]" + $2.c;
     }
-  | FUNCTION {dentroFuncao = true;} '(' LISTA_PARAMs ')' '{' CMDs '}'
+  | FUNCTION '(' LISTA_PARAMs ')' '{' CMDs '}'
            { 
              string lbl_endereco_funcao = gera_label( "func_anon" );
              string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
              
              $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
-             funcoes = funcoes + definicao_lbl_endereco_funcao + $4.c + $7.c +
+             funcoes = funcoes + definicao_lbl_endereco_funcao + $3.c + $6.c +
                        "undefined" + "@" + "'&retorno'" + "@"+ "~";
              ts.pop_back(); 
              dentroFuncao = false;
            }
-  | ID SETA EMPILHA_TS E
+  | ID SETA EMPILHA_TS_FUNC E
       {
         string lbl_endereco_funcao = gera_label( "func_anon" );
         string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
@@ -536,9 +539,10 @@ E : ID '=' E
         $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
         funcoes = funcoes + definicao_lbl_endereco_funcao + declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) +
         $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^" + $4.c + "'&retorno'" + "@"+ "~";
-        ts.pop_back(); 
+        ts.pop_back();
+        dentroFuncao = false;
       }
-  | ID SETA EMPILHA_TS '{' CMDs '}'
+  | ID SETA EMPILHA_TS_FUNC '{' CMDs '}'
       {
         string lbl_endereco_funcao = gera_label( "func_anon" );
         string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
@@ -546,9 +550,10 @@ E : ID '=' E
         $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
         funcoes = funcoes + definicao_lbl_endereco_funcao + declara_var( DeclLet, $1.c[0], $1.linha, $1.coluna ) +
         $1.c + "arguments" + "@" + "0" + "[@]" + "=" + "^" + $5.c + "undefined" + "@" + "'&retorno'" + "@"+ "~";
-        ts.pop_back(); 
+        ts.pop_back();
+        dentroFuncao = false;
       }
-  | '(' PARENTESES_FUNCAO SETA EMPILHA_TS E
+  | '(' PARENTESES_FUNCAO SETA EMPILHA_TS_FUNC E
       {
         string lbl_endereco_funcao = gera_label( "func_anon" );
         string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
@@ -556,8 +561,9 @@ E : ID '=' E
         $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
         funcoes = funcoes + definicao_lbl_endereco_funcao + $4.c + "'&retorno'" + "@"+ "~";
         ts.pop_back();
+        dentroFuncao = false;
       }
-  | '(' PARENTESES_FUNCAO SETA '{' EMPILHA_TS CMDs '}'
+  | '(' PARENTESES_FUNCAO SETA '{' EMPILHA_TS_FUNC CMDs '}'
       {
         string lbl_endereco_funcao = gera_label( "func_anon" );
         string definicao_lbl_endereco_funcao = ":" + lbl_endereco_funcao;
@@ -565,6 +571,7 @@ E : ID '=' E
         $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
         funcoes = funcoes + definicao_lbl_endereco_funcao + $6.c + "undefined" + "@" + "'&retorno'" + "@"+ "~";
         ts.pop_back();
+        dentroFuncao = false;
       }
   | '(' LISTA_PARAMs PARENTESES_FUNCAO SETA E
       {
@@ -583,6 +590,7 @@ E : ID '=' E
         $$.c = vector<string>{"{}"} + "'&funcao'" + lbl_endereco_funcao + "[<=]";
         funcoes = funcoes + definicao_lbl_endereco_funcao + $2.c + $6.c + "undefined" + "@" + "'&retorno'" + "@"+ "~";
         ts.pop_back();
+        dentroFuncao = false;
       }
   ;
 
